@@ -26,7 +26,8 @@ class Birthday(Field):
     # Клас для зберігання дня народження у форматі ДД.ММ.РРРР.
     def __init__(self, value):
         try:
-            self.value = datetime.strptime(value, '%d.%m.%Y').date()
+            datetime.strptime(value, '%d.%m.%Y')  # Перевірка формату
+            super().__init__(value)
         except ValueError:
             raise ValueError("Дата народження повинна бути у форматі ДД.ММ.РРРР")
 
@@ -75,21 +76,25 @@ class Record:
         self.birthday = Birthday(birthday)
 
     def days_to_birthday(self):
-        # Розраховує кількість днів до наступного дня народження
+        #Розраховує кількість днів до наступного дня народження
         if not self.birthday:
             return None
 
         today = datetime.today().date()
-        next_birthday = self.birthday.value.replace(year=today.year)
+        birthday_date = datetime.strptime(self.birthday.value, '%d.%m.%Y').date()
+        next_birthday = birthday_date.replace(year=today.year)
 
         if next_birthday < today:
             next_birthday = next_birthday.replace(year=today.year + 1)
+
+        if next_birthday.weekday() in (5, 6):  # Перенос на понеділок
+            next_birthday += timedelta(days=(7 - next_birthday.weekday()))
 
         return (next_birthday - today).days
 
     def __str__(self):
         phones = '; '.join(p.value for p in self.phones)
-        birthday = f", birthday: {self.birthday.value.strftime('%d.%m.%Y')}" if self.birthday else ''
+        birthday = f", birthday: {self.birthday.value}" if self.birthday else ''
         return f"Contact name: {self.name.value}, phones: {phones}{birthday}"
 
 class AddressBook(UserDict):
@@ -117,10 +122,14 @@ class AddressBook(UserDict):
 
         for record in self.data.values():
             if record.birthday:
-                next_birthday = record.birthday.value.replace(year=today.year)
+                birthday_date = datetime.strptime(record.birthday.value, '%d.%m.%Y').date()
+                next_birthday = birthday_date.replace(year=today.year)
 
                 if next_birthday < today:
                     next_birthday = next_birthday.replace(year=today.year + 1)
+
+                if next_birthday.weekday() in (5, 6):  # Перенос на понеділок
+                    next_birthday += timedelta(days=(7 - next_birthday.weekday()))
 
                 if (next_birthday - today).days <= days:
                     upcoming.append((record.name.value, next_birthday))
@@ -128,7 +137,7 @@ class AddressBook(UserDict):
         return sorted(upcoming, key=lambda x: x[1])
 
     def __str__(self):
-        """Повертає всі записи у вигляді рядка."""
+        # Повертає всі записи у вигляді рядка
         return '\n'.join(str(record) for record in self.data.values())
 
 
@@ -182,13 +191,32 @@ def show_phone(args, book):
     return f"{name}'s phones: {phones}."
 
 @input_error
+def change_phone(args, book):
+    # Змінює телефон у контакті
+    name, old_phone, new_phone = args
+    record = book.find(name)
+    if not record:
+        raise KeyError
+    record.edit_phone(old_phone, new_phone)
+    return f"Phone for {name} updated."
+
+@input_error
+def show_birthday(args, book):
+    # Показує день народження контакту
+    name, = args
+    record = book.find(name)
+    if not record or not record.birthday:
+        raise KeyError("No birthday found.")
+    return f"{name}'s birthday: {record.birthday.value}."
+
+@input_error
 def show_all(book):
-    #Показує всі контакти
+    # Показує всі контакти
     return str(book) if book.data else "No contacts saved."
 
 @input_error
 def birthdays(book):
-    #Показує контакти з найближчими днями народження
+    # Показує контакти з найближчими днями народження
     upcoming = book.upcoming_birthdays()
     if not upcoming:
         return "No upcoming birthdays."

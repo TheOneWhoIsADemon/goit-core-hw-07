@@ -246,6 +246,10 @@ def main():
                 print(show_all(book))
             elif command == "birthdays":
                 print(birthdays(book))
+            elif command == "change":
+                print(change_phone(args, book))
+            elif command == "show-birthday":
+                print(show_birthday(args, book))
             else:
                 print("Invalid command.")
         except Exception as e:
